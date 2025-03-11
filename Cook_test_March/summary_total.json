@@ -1,0 +1,8 @@
+{
+    "accuracy_test": 0.7434049079754601,
+    "accuracy_test_clean": 0.8354294478527607,
+    "accuracy_test_response": 0.9093558282208589,
+    "f1_test": 0.2171268132896584,
+    "f1_test_Clean": 0.16106333072713058,
+    "f1_response": 0.24327784891165172
+}

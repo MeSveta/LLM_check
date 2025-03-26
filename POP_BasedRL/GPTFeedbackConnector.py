@@ -82,6 +82,8 @@ class GPTFeedbackConnector:
             parsed = json.loads(raw_response)
             parsed_recheck = self.recheck_bad_transitions(goal, actions, action_sequence, parsed['bad transitions'])
             parsed['bad transitions'] = parsed_recheck['confirmed_bad_transitions']
+            print("bad transitions")
+            print(parsed['bad transitions'])
             return parsed
 
         except json.JSONDecodeError as e:
@@ -106,7 +108,7 @@ class GPTFeedbackConnector:
             f"The corresponding action names are: {actions_text}\n"
             f"The following transitions were marked as 'bad': {bad_transitions}\n\n"
             "Please recheck each bad transition one by one and evaluate if they are truly out of order.\n"
-            "For each, respond with a JSON list like this:\n"
+            "For each, respond with a JSON format only like this:\n"
             "{\n"
             "  \"confirmed_bad_transitions\": [[a, b], ...],\n"
             "  \"mistakenly_marked\": [[x, y], ...],\n"

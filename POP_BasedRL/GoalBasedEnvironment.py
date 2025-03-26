@@ -94,12 +94,12 @@ class GoalBasedEnvironment(gym.Env):
 
             else:
 
+                if t==len(episode)-1 or action == self.end_state:
+                    reward_t += -10
                 if action in visited_list[0:t]: # state taken twice , the same action taken twice
                     reward_t += -1
                 elif state in state_transitions:
                     reward_t += -1  # not ligall transition
-                elif action == self.end_state:
-                    reward_t += -10
 
             episode_copy[t] = (state, action, reward_t, act_prob)
 

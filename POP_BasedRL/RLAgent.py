@@ -4,7 +4,7 @@ from collections import defaultdict
 import json
 
 
-class MonteCarloAgent:
+class RLAgent:
     def __init__(self,agent_config, init_sequence_path, constraints, state_space_size, action_space_size, alpha=0.1, gamma=0.9, behavior_policy_epsilon=0.2, num_episodes=1000):
         self.agent_config = agent_config
         self.init_sequence_path = init_sequence_path
@@ -73,16 +73,23 @@ class MonteCarloAgent:
         done = False
 
 
-        while not done:
-            action, act_prob = self.create_behavior_policy(state)
-            next_state, reward, done, _ = env.step(action)
-            episode.append((state, action, reward, act_prob))
-            state = next_state
+        if self.agent_config['train']['mode'] == 'MCC':
+            while not done:
+                action, act_prob = self.create_behavior_policy(state)
+                next_state, reward, done, _ = env.step(action)
+                episode.append((state, action, reward, act_prob))
+                state = next_state
 
-        if done:
-            # send the sequence to LLM to check the final sequence and sub transitions
-            episode_copy = env.compute_reward(episode)
-            episode = episode_copy
+            if done:
+                # send the sequence to LLM to check the final sequence and sub transitions
+                episode_copy = env.compute_reward(episode)
+                episode = episode_copy
+        elif self.agent_config['train']['mode'] == 'TD':
+                action, act_prob = self.create_behavior_policy(state)
+                next_state, reward, done, _ = env.step_TD(action)
+                episode.append((state, action, reward, act_prob))
+                state = next_state
+
 
         return episode
 
@@ -146,7 +153,7 @@ class MonteCarloAgent:
             G = 0
             W, G = self.MCC_update(episode, W, G)
 
-    def train(self, env, num_episodes=1000):
+    def train_MCC(self, env, num_episodes=1000):
         """Trains the agent using Monte Carlo with importance sampling."""
         for episode_index in range(num_episodes):
             episode = self.generate_episode(env)
@@ -160,5 +167,21 @@ class MonteCarloAgent:
             if np.mod(episode_index, 1) == 0:
                 print(
                     f'Episode: {episode_index}: {action_sequence}, reward: {self.reward_hist[episode_index]}, epsilon:{self.behavior_policy_epsilon}')
+
+    def train_TD(self, env, num_episodes=1000):
+        """Trains the agent using Monte Carlo with importance sampling."""
+        for episode_index in range(num_episodes):
+            episode = self.generate_episode(env)
+            G = 0
+            W = 1
+
+            self.reward_hist[episode_index] = np.sum([ii[2] for ii in episode])
+            W,G = self.MCC_update(episode,W,G)
+
+            action_sequence = [episode_i[0] for episode_i in episode]
+            if np.mod(episode_index, 1) == 0:
+                print(
+                    f'Episode: {episode_index}: {action_sequence}, reward: {self.reward_hist[episode_index]}, epsilon:{self.behavior_policy_epsilon}')
+
 
 

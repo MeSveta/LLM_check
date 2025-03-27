@@ -18,7 +18,10 @@ class GoalBasedEnvironment(gym.Env):
         self.goal = os.path.splitext(os.path.basename(env_config['json_path']))[0]
 
         self.actions = config.get("steps", {})
-        self.edges = config.get("constraints_LLM", [])['constraints']
+        if env_config['constraints_flag']=="LLM":
+            self.edges = config.get("constraints_LLM", [])['constraints']
+        elif env_config['constraints_flag']==True:
+            self.edges = config.get("edges", [])
 
         self.end_state = [ii for ii , k in enumerate(self.actions.values()) if k == 'END'][0]
 
@@ -30,7 +33,7 @@ class GoalBasedEnvironment(gym.Env):
         self.max_steps = len(self.actions)
         self.constraints_flag = env_config['constraints_flag']
 
-        if env_config['constraints_flag']:
+        if env_config['constraints_flag']=="LLM" or env_config['constraints_flag']==True:
             self.valid_transitions = {src: [] for src in range(self.max_steps - 1)}
             for src, dest in self.edges:
                 self.valid_transitions[src].append(dest)
@@ -40,6 +43,27 @@ class GoalBasedEnvironment(gym.Env):
         self.current_step = "0"  # Start from step "0"
 
     def step(self, action):
+        """Take an action in the environment."""
+
+
+        if (action in self.visited_actions or
+                (action == self.end_state and len(self.visited_actions) < len(self.actions) - 1)):  # Prevent END early
+            reward = -1.0  # Penalty for invalid or repeated action or early END
+            done = True
+        else:
+
+
+            self.state = action  # Mark action as taken
+            self.visited_actions.add(action)
+            self.steps_taken += 1
+            self.current_step = action  # Move to next step
+            done = self.current_step == self.end_state  # Check if END step is reached
+            reward = 0.0
+
+        return self.state, reward, done, {}
+
+
+    def step_TD(self, action):
         """Take an action in the environment."""
 
 

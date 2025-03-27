@@ -1,7 +1,7 @@
 import numpy as np
 import random
 from GoalBasedEnvironment import GoalBasedEnvironment
-from MonteCarloAgent import MonteCarloAgent
+from RLAgent import RLAgent
 import json
 import yaml
 import os
@@ -21,19 +21,21 @@ def main(config):
             # Path to your JSON file
 
             constraints = data.get("constraints_LLM", [])
+
             steps = data["steps"]
             num_actions = len(steps)
             num_states = num_actions  # Assuming one-to-one mapping of steps to state ids
 
             # Create the environment
             env = GoalBasedEnvironment(env_config = config['env'],file_path = full_path)
-            agent = MonteCarloAgent(agent_config = config['agent'],init_sequence_path = full_path,
+            agent = RLAgent(agent_config = config['agent'],init_sequence_path = full_path,
                 constraints=env.valid_transitions,
                 state_space_size=num_states,
                 action_space_size=num_actions
             )
 
-            agent.train(env, num_episodes=5)
+            agent.train_TD(env, num_episodes=5)
+            agent.train_MCC(env, num_episodes=5)
 
             # Print learned policy
             policy = agent.get_policy()
@@ -43,7 +45,7 @@ def main(config):
 
 
 if __name__ == "__main__":
-    with open("POP_RL_config.yaml", "r") as f:
+    with open("POP_RL_config_TD.yaml", "r") as f:
         config = yaml.safe_load(f)
 
     #file_path = r"C:\Users\Sveta\PycharmProjects\data\Cook\LLM\blenderbananapancakes.json"

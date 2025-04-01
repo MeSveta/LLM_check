@@ -5,7 +5,7 @@ import json
 
 
 class RLAgent:
-    def __init__(self,agent_config, init_sequence_path, constraints, state_space_size, action_space_size, alpha=0.1, gamma=0.9, behavior_policy_epsilon=0.2, num_episodes=1000):
+    def __init__(self,agent_config, init_sequence_path, constraints, state_space_size, action_space_size, alpha=0.1, gamma=0.9, behavior_policy_epsilon=0.2, num_episodes=10000):
         self.agent_config = agent_config
         self.init_sequence_path = init_sequence_path
         self.state_space_size = state_space_size
@@ -80,7 +80,7 @@ class RLAgent:
                 episode.append((state, action, reward, act_prob))
                 state = next_state
 
-            if done:
+            if done and env.reward_type=='LLM':
                 # send the sequence to LLM to check the final sequence and sub transitions
                 episode_copy = env.compute_reward(episode)
                 episode = episode_copy
@@ -153,7 +153,7 @@ class RLAgent:
             G = 0
             W, G = self.MCC_update(episode, W, G)
 
-    def train_MCC(self, env, num_episodes=1000):
+    def train_MCC(self, env, num_episodes=10000):
         """Trains the agent using Monte Carlo with importance sampling."""
         for episode_index in range(num_episodes):
             episode = self.generate_episode(env)

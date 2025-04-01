@@ -2,6 +2,7 @@ import json
 import gym
 import numpy as np
 import os
+import copy
 from gym import spaces
 from GPTFeedbackConnector import GPTFeedbackConnector
 
@@ -28,39 +29,107 @@ class GoalBasedEnvironment(gym.Env):
         self.action_space = spaces.Discrete(len(self.actions))  # Number of available actions
         self.observation_space = spaces.Box(low=0, high=1, shape=(len(self.actions),), dtype=np.float32)
 
-        self.state = np.zeros(1)  # Initial state representation
+        self.state = 0  # Initial state representation
         self.steps_taken = 0
         self.max_steps = len(self.actions)
         self.constraints_flag = env_config['constraints_flag']
+        self.reward_type = env_config['reward_type']
 
         if env_config['constraints_flag']=="LLM" or env_config['constraints_flag']==True:
             self.valid_transitions = {src: [] for src in range(self.max_steps - 1)}
             for src, dest in self.edges:
                 self.valid_transitions[src].append(dest)
+            self.update_valid_transitions = self.update_valid_transitions_func()
+
         else:
             self.valid_transitions = []
 
         self.current_step = "0"  # Start from step "0"
 
     def step(self, action):
-        """Take an action in the environment."""
+        """Take an action in the environment and return state, reward, done, and info."""
+        reward = 0
+        done = False
 
+        # Track the number of steps
+        self.steps_taken += 1
 
-        if (action in self.visited_actions or
-                (action == self.end_state and len(self.visited_actions) < len(self.actions) - 1)):  # Prevent END early
-            reward = -1.0  # Penalty for invalid or repeated action or early END
+        # Check for repeated actions
+        if action in self.visited_actions:
+            reward += -5.0
             done = True
-        else:
 
+        # Step limit reached
+        elif self.steps_taken >= self.max_steps:
+            reward += -5.0
+            done = True
 
-            self.state = action  # Mark action as taken
-            self.visited_actions.add(action)
-            self.steps_taken += 1
-            self.current_step = action  # Move to next step
-            done = self.current_step == self.end_state  # Check if END step is reached
-            reward = 0.0
+        # Check for premature END
+        elif action == self.end_state and len(self.visited_actions) < len(self.actions) - 1:
+            if not action not in self.update_valid_transitions[self.state]:
+                reward += -10.0
+            else:
+                reward += 1.0
+            done = True
+
+        # Check for successful completion
+        elif action == self.end_state and len(self.visited_actions) == len(self.actions) - 1:
+            reward += 10.0
+            done = True
+
+        # Check for invalid transition
+        elif not self.state == self.end_state:
+            if action not in self.update_valid_transitions[self.state]:
+                reward += -1.0
+                done = True
+            else:
+                reward += 1.0
+
+        # Valid progress
+        self.state = action
+        self.current_step = action
+        self.visited_actions.add(action)
 
         return self.state, reward, done, {}
+
+    def update_valid_transitions_func(self):
+        """
+        Update the valid_transitions dictionary by adding interconnections for states with multiple transitions.
+        """
+
+        valid_transitions = copy.deepcopy(self.valid_transitions)
+        valid_transitions_updated = copy.deepcopy(valid_transitions)
+        # First, identify states with multiple transitions
+        for state, transitions in valid_transitions.items():
+            if len(transitions) > 1:
+                # For each state in the transition set, add connections to all others
+                for t in transitions:
+                    if t not in valid_transitions:
+                        valid_transitions_updated[t] = []
+                    # Ensure all other transitions are connected
+                    for other in transitions:
+                        if other != t and other not in valid_transitions[t]:
+                            valid_transitions_updated[t].append(other)
+
+        return valid_transitions_updated
+
+
+
+
+
+        # reward = 0.0
+        # #print(f"state: {self.state}")
+        # if len(self.visited_actions) == len(self.actions)-1:
+        #     done = True
+        # if not (self.state==self.end_state) and not (action in self.valid_transitions[self.state]):
+        #     reward = -1.0
+        # self.state = action  # Mark action as taken
+        # self.visited_actions.add(action)
+        # self.steps_taken += 1
+        #   # Move to next step
+        # done = self.current_step == self.end_state  # Check if END step is reached
+        #
+        # return self.state, reward, done, {}
 
 
     def step_TD(self, action):
@@ -87,6 +156,7 @@ class GoalBasedEnvironment(gym.Env):
         """Reset the environment."""
         #self.state = np.zeros(1)
         self.steps_taken = 0
+        self.state = 0
         self.current_step = 0
         self.visited_actions = set([0])
         return self.current_step

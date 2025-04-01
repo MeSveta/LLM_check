@@ -5,12 +5,21 @@ from RLAgent import RLAgent
 import json
 import yaml
 import os
+from utils.generate_results import PlotResults
 
-
+class CustomEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()  # Convert NumPy arrays to lists
+        elif isinstance(obj, np.int64):
+            return int(obj)  # Convert np.int64 to regular int
+        return super().default(obj)
 
 
 def main(config):
     json_dir = config['env']['json_path']
+    save_dir = "C:/Users/Sveta/PycharmProjects/LLM_check/RL_project"
+    num_episodes = 100000
     if os.path.isdir(json_dir):
         for filename in os.listdir(json_dir):
             if filename.endswith('.json'):
@@ -31,17 +40,42 @@ def main(config):
             agent = RLAgent(agent_config = config['agent'],init_sequence_path = full_path,
                 constraints=env.valid_transitions,
                 state_space_size=num_states,
-                action_space_size=num_actions
+                action_space_size=num_actions,
+                num_episodes=num_episodes
             )
 
-            agent.train_TD(env, num_episodes=5)
-            agent.train_MCC(env, num_episodes=5)
+
+            agent.train_MCC(env, num_episodes=num_episodes)
+            #agent.train_TD(env, num_episodes=5)
+
+            res = {}
+            res['Q'] = agent.Q
+            res['target_policy'] = agent.target_policy
+            res['rewards_hist'] = agent.reward_hist
+            res['env_constrains'] = env.valid_transitions
+            res['res_constrains_updated'] = env.update_valid_transitions
+            res['goal'] = env.goal
+            res['steps'] = env.actions
+
+            file_name = 'MCC_agent'+env.goal+'.json'
+            with open(file_name, "w") as f:
+                json.dump(res, f, indent=4, cls=CustomEncoder)
+
+
 
             # Print learned policy
-            policy = agent.get_policy()
+            policy = agent.generate_target_policy()
+            policy = agent.target_policy
             print("\nLearned Policy:")
+            state_u = 0
             for state, action in policy.items():
+                state = state_u
+                action = policy[state]
                 print(f"State {state} -> Action {action} ({steps[str(action)]})")
+                state_u = action
+            rewards = [agent.reward_hist]
+            gen_res = PlotResults(env = env, Q = agent.Q, rewards = rewards, save_dir = save_dir)
+            gen_res.plot_rewards()
 
 
 if __name__ == "__main__":

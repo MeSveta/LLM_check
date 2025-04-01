@@ -16,7 +16,7 @@ class GoalBasedEnvironment(gym.Env):
             config = json.load(file)
 
         # Extract goal from filename
-        self.goal = os.path.splitext(os.path.basename(env_config['json_path']))[0]
+        self.goal = os.path.splitext(os.path.basename(file_path))[0]
 
         self.actions = config.get("steps", {})
         if env_config['constraints_flag']=="LLM":

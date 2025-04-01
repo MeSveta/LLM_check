@@ -49,9 +49,10 @@ class PlotResults:
 
     def plot_rewards(self):
         y=[]
+        save_file = self.save_dir+'/plots/rewards_'+self.env.goal +'.png'
 
         # Apply moving average smoothing
-        window_size = 100
+        window_size = 1000
         if len(self.rewards)==2:
             for i in range(np.size(self.rewards,axis = 1)):
                 y.append(self.rewards[i])
@@ -75,10 +76,9 @@ class PlotResults:
             plt.ylabel("Rewards")
             plt.legend()
             plt.grid(True)
-            plt.ylim([-50, 50])
+            plt.ylim([-20, 20])
             plt.title("MCC reward")
-            #plt.savefig(f'./plots/track_A_regular_diff_epsilon.png')
-            plt.savefig(self.save_dir+f'/MCC_epsilon02.png')
+            plt.savefig(save_file)
             plt.show()
 
 

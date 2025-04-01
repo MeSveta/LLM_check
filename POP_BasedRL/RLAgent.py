@@ -171,13 +171,21 @@ class RLAgent:
     def train_TD(self, env, num_episodes=1000):
         """Trains the agent using Monte Carlo with importance sampling."""
         for episode_index in range(num_episodes):
-            episode = self.generate_episode(env)
-            G = 0
-            W = 1
+            done = False
+            episode = []
+            while done:
+                state = env.reset()
+                action, act_prob = self.create_behavior_policy(state)
+                next_state, reward, done, _ = env.step(action)
+
+                action_next, [] = self.create_behavior_policy(next_state)
+                self.Q[state][action] += self.alpha * (reward + self.gamma*self.Q[next_state][action_next]-self.Q[state][action])
+
+                # Improve policy (greedy update)
+                self.target_policy[state] = self.max_argmax(self.Q[state])
+                episode.append((state, action, reward, act_prob))
 
             self.reward_hist[episode_index] = np.sum([ii[2] for ii in episode])
-            W,G = self.MCC_update(episode,W,G)
-
             action_sequence = [episode_i[0] for episode_i in episode]
             if np.mod(episode_index, 1) == 0:
                 print(

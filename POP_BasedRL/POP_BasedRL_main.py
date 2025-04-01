@@ -18,8 +18,8 @@ class CustomEncoder(json.JSONEncoder):
 
 def main(config):
     json_dir = config['env']['json_path']
-    save_dir = "C:/Users/Sveta/PycharmProjects/LLM_check/RL_project"
-    num_episodes = 100000
+    save_dir = "C:/Users/spaste01/PycharmProjects/Results/PPO_RL"
+    num_episodes = 200000
     if os.path.isdir(json_dir):
         for filename in os.listdir(json_dir):
             if filename.endswith('.json'):
@@ -36,36 +36,42 @@ def main(config):
             num_states = num_actions  # Assuming one-to-one mapping of steps to state ids
 
             # Create the environment
-            env = GoalBasedEnvironment(env_config = config['env'],file_path = full_path)
-            agent = RLAgent(agent_config = config['agent'],init_sequence_path = full_path,
-                constraints=env.valid_transitions,
-                state_space_size=num_states,
-                action_space_size=num_actions,
-                num_episodes=num_episodes
-            )
+            #env_MCC = GoalBasedEnvironment(env_config = config['env'],file_path = full_path)
+            env_TD = GoalBasedEnvironment(env_config=config['env'], file_path=full_path)
+            # agent_MCC = RLAgent(agent_config = config['agent'],init_sequence_path = full_path,
+            #     constraints=env_MCC.valid_transitions,
+            #     state_space_size=num_states,
+            #     action_space_size=num_actions,
+            #     num_episodes=num_episodes
+            # )
 
+            agent_TD = RLAgent(agent_config=config['agent'], init_sequence_path=full_path,
+                                constraints=env_TD.valid_transitions,
+                                state_space_size=num_states,
+                                action_space_size=num_actions,
+                                num_episodes=num_episodes
+                                )
 
-            agent.train_MCC(env, num_episodes=num_episodes)
-            #agent.train_TD(env, num_episodes=5)
+            #agent_MCC.train_MCC(env_MCC, num_episodes=num_episodes)
+            agent_TD.train_TD(env_TD, num_episodes=5)
 
             res = {}
-            res['Q'] = agent.Q
-            res['target_policy'] = agent.target_policy
-            res['rewards_hist'] = agent.reward_hist
-            res['env_constrains'] = env.valid_transitions
-            res['res_constrains_updated'] = env.update_valid_transitions
-            res['goal'] = env.goal
-            res['steps'] = env.actions
+            res['Q'] = agent_TD.Q
+            res['target_policy'] = agent_TD.target_policy
+            res['rewards_hist'] = agent_TD.reward_hist
+            res['env_constrains'] = agent_TD.valid_transitions
+            res['res_constrains_updated'] = agent_TD.update_valid_transitions
+            res['goal'] = agent_TD.goal
+            res['steps'] = agent_TD.actions
 
-            file_name = 'MCC_agent'+env.goal+'.json'
+            file_name = 'TD_agent' + agent_TD.goal + '.json'
             with open(file_name, "w") as f:
                 json.dump(res, f, indent=4, cls=CustomEncoder)
 
 
-
             # Print learned policy
-            policy = agent.generate_target_policy()
-            policy = agent.target_policy
+            policy = agent_TD.generate_target_policy()
+            policy = agent_TD.target_policy
             print("\nLearned Policy:")
             state_u = 0
             for state, action in policy.items():
@@ -73,9 +79,13 @@ def main(config):
                 action = policy[state]
                 print(f"State {state} -> Action {action} ({steps[str(action)]})")
                 state_u = action
-            rewards = [agent.reward_hist]
-            gen_res = PlotResults(env = env, Q = agent.Q, rewards = rewards, save_dir = save_dir)
+
+            #prepare for plot
+            rewards = [agent_TD.reward_hist]
+            gen_res = PlotResults(env = env_TD, Q = agent_TD.Q, rewards = rewards, save_dir = save_dir)
             gen_res.plot_rewards()
+
+
 
 
 if __name__ == "__main__":
@@ -83,7 +93,7 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
 
     #file_path = r"C:\Users\Sveta\PycharmProjects\data\Cook\LLM\blenderbananapancakes.json"
-    config['env']['json_path'] = r"C:\Users\Sveta\PycharmProjects\data\Cook\LLM"
-    config['agent']['init_sequence_path'] = r"C:\Users\Sveta\PycharmProjects\data\Cook\LLM"
+    # config['env']['json_path'] = r"C:\Users\Sveta\PycharmProjects\data\Cook\LLM"
+    # config['agent']['init_sequence_path'] = r"C:\Users\Sveta\PycharmProjects\data\Cook\LLM"
 
     main(config)

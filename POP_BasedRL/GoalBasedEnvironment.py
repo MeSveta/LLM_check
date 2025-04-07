@@ -3,6 +3,7 @@ import gym
 import numpy as np
 import os
 import copy
+from collections import defaultdict
 from gym import spaces
 from GPTFeedbackConnector import GPTFeedbackConnector
 
@@ -19,9 +20,9 @@ class GoalBasedEnvironment(gym.Env):
         self.goal = os.path.splitext(os.path.basename(file_path))[0]
 
         self.actions = config.get("steps", {})
-        if env_config['constraints_flag']=="LLM":
+        if env_config['constraints_flag']=="LLM": # an option to initialize constrains by LLM
             self.edges = config.get("constraints_LLM", [])['constraints']
-        elif env_config['constraints_flag']==True:
+        elif env_config['constraints_flag']==True: #in case of LLM no constrains info used
             self.edges = config.get("edges", [])
 
         self.end_state = [ii for ii , k in enumerate(self.actions.values()) if k == 'END'][0]
@@ -40,13 +41,111 @@ class GoalBasedEnvironment(gym.Env):
             for src, dest in self.edges:
                 self.valid_transitions[src].append(dest)
             self.update_valid_transitions = self.update_valid_transitions_func()
+            self.preconditions = self.extract_preconditions_from_transitions()
 
         else:
             self.valid_transitions = []
+            self.update_valid_transitions = []
 
         self.current_step = "0"  # Start from step "0"
 
     def step(self, action):
+        """Take an action in the environment and return state, reward, done, and info."""
+        reward = 0.0
+        done = False
+        info = {}
+
+        # Track the number of steps
+        self.steps_taken += 1
+
+        # Semantic preconditions: what must be visited before a certain action
+        # preconditions = {
+        #     7: {5, 9, 12},  # blitz → needs banana, egg, flour
+        #     11: {7},  # pour → needs blitz
+        #     6: {11},  # cook → needs pour
+        #     8: {6},  # flip → needs cook
+        #     10: {8},  # cook more → needs flip
+        #     2: {14},  # serve → needs transfer
+        #     15: {2}  # END → needs serve
+        # }
+
+        # Check for repeated actions
+        if action in self.visited_actions:
+            reward += -10.0
+            done = True
+            info["reason"] = "repeated action"
+
+        # Step limit reached
+        elif self.steps_taken >= self.max_steps:
+            reward += -5.0
+            done = True
+            info["reason"] = "step limit reached"
+
+        # Premature END
+        elif action == self.end_state and len(self.visited_actions) < len(self.actions) - 1:
+            if action not in self.update_valid_transitions[self.state]:
+                reward += -10.0
+                info["reason"] = "premature END and invalid transition"
+            else:
+                reward += 1.0
+                info["reason"] = "premature END but valid transition"
+            done = True
+
+        # Successful completion
+        elif action == self.end_state and len(self.visited_actions) == len(self.actions) - 1:
+            reward += 10.0
+            done = True
+            info["reason"] = "successful completion"
+
+        # Normal transitions
+        elif not self.state == self.end_state:
+            if action not in self.update_valid_transitions[self.state]:
+                reward += -5.0
+                done = True
+                info["reason"] = "invalid transition"
+            else:
+                #Check semantic preconditions
+                required = self.preconditions.get(action, set())
+                if not required.issubset(self.visited_actions):
+                    reward += -5.0
+                    info["reason"] = f"violated preconditions for action {action}"
+                    info["missing"] = list(required - self.visited_actions)
+                    done = True
+                else:
+                    reward += 5.0
+                    info["reason"] = "valid logical transition"
+
+        # Advance state
+        self.state = action
+        self.current_step = action
+        self.visited_actions.append(action)
+
+        return self.state, reward, done, info
+
+    def step_LLM(self, action):
+        reward = 0
+        done = False
+
+        # Track the number of steps
+        self.steps_taken += 1
+
+        # Step limit reached
+        if self.steps_taken >= self.max_steps:
+            reward += -5.0
+            done = True
+
+
+        if action == self.end_state:
+            done = True
+
+        # Valid progress
+        self.state = action
+        self.current_step = action
+        self.visited_actions.append(action)
+
+        return self.state, reward, done, {}
+
+    def step_MCC(self, action):
         """Take an action in the environment and return state, reward, done, and info."""
         reward = 0
         done = False
@@ -65,12 +164,14 @@ class GoalBasedEnvironment(gym.Env):
             done = True
 
         # Check for premature END
+
         elif action == self.end_state and len(self.visited_actions) < len(self.actions) - 1:
-            if not action not in self.update_valid_transitions[self.state]:
-                reward += -10.0
-            else:
-                reward += 1.0
-            done = True
+            if not self.update_valid_transitions == []:
+                if not action in self.update_valid_transitions[self.state]:
+                    reward += -10.0
+                else:
+                    reward += 1.0
+                done = True
 
         # Check for successful completion
         elif action == self.end_state and len(self.visited_actions) == len(self.actions) - 1:
@@ -79,16 +180,17 @@ class GoalBasedEnvironment(gym.Env):
 
         # Check for invalid transition
         elif not self.state == self.end_state:
-            if action not in self.update_valid_transitions[self.state]:
-                reward += -1.0
-                done = True
-            else:
-                reward += 1.0
+            if not self.update_valid_transitions == []:
+                if action not in self.update_valid_transitions[self.state]:
+                    reward += -1.0
+                    done = True
+                else:
+                    reward += 1.0
 
         # Valid progress
         self.state = action
         self.current_step = action
-        self.visited_actions.add(action)
+        self.visited_actions.append(action)
 
         return self.state, reward, done, {}
 
@@ -113,23 +215,12 @@ class GoalBasedEnvironment(gym.Env):
 
         return valid_transitions_updated
 
-
-
-
-
-        # reward = 0.0
-        # #print(f"state: {self.state}")
-        # if len(self.visited_actions) == len(self.actions)-1:
-        #     done = True
-        # if not (self.state==self.end_state) and not (action in self.valid_transitions[self.state]):
-        #     reward = -1.0
-        # self.state = action  # Mark action as taken
-        # self.visited_actions.add(action)
-        # self.steps_taken += 1
-        #   # Move to next step
-        # done = self.current_step == self.end_state  # Check if END step is reached
-        #
-        # return self.state, reward, done, {}
+    def extract_preconditions_from_transitions(self):
+        preconditions = defaultdict(set)
+        for src, dest_list in self.valid_transitions.items():
+            for dest in dest_list:
+                preconditions[dest].add(src)
+        return dict(preconditions)
 
 
     def step_TD(self, action):
@@ -156,9 +247,9 @@ class GoalBasedEnvironment(gym.Env):
         """Reset the environment."""
         #self.state = np.zeros(1)
         self.steps_taken = 0
-        self.state = 0
-        self.current_step = 0
-        self.visited_actions = set([0])
+        self.state = 0 #np.random.choice(range(len(self.actions)-1))
+        self.current_step = 0#self.state.copy()
+        self.visited_actions = [0]
         return self.current_step
 
     def compute_reward(self, episode):
@@ -171,29 +262,78 @@ class GoalBasedEnvironment(gym.Env):
         episode_copy = episode.copy()
 
         bad_transitions = episode_reward['bad transitions']
-        bad_transitions_filtered = self.filter_transitions_by_sequence(bad_transitions, action_sequence)
-        state_transitions = [state_i[0] for state_i in bad_transitions_filtered]
 
+        if episode_reward['reward']==1 and bad_transitions==[]:
+            good_transitions = [[i[0],i[1]] for i in episode]
+        else:
+            good_transitions = episode_reward['good transitions']
+        self.valid_transitions = {i[0]:[i[1]] for i in good_transitions}
+        self.update_valid_transitions = self.update_valid_transitions_func()
+        bad_transitions_filtered = self.filter_transitions_by_sequence(bad_transitions, action_sequence)
+        filtered_bad_tr = [tr for tr in bad_transitions_filtered if tr not in good_transitions]
+        state_transitions = [state_i[0] for state_i in filtered_bad_tr]
+
+        # filter out from bad_transitions the goog_transitions (LLM might wrong
         visited_list = list(self.visited_actions)
         for t in reversed(range(len(episode))):
             reward_t = 0
+            visited_actions = []
+
+            visited_actions = visited_list[0:t+1]
             state, action, reward, act_prob = episode[t]
-            if t == self.max_steps-1:
-                if action == self.end_state:
-                    if episode_reward['reward']==1:
-                        reward_t += 10
-                        # at the ebd of the sequence , LLM indicates good sequence, the goal is reached then the reward is high
-                    else:
-                        reward_t += -10
 
-            else:
+            # Check for repeated actions
+            if action in visited_actions:
+                reward_t += -5.0
+                done = True
 
-                if t==len(episode)-1 or action == self.end_state:
-                    reward_t += -10
-                if action in visited_list[0:t]: # state taken twice , the same action taken twice
-                    reward_t += -1
-                elif state in state_transitions:
-                    reward_t += -1  # not ligall transition
+            # Step limit reached
+            elif t >= self.max_steps:
+                reward_t += -5.0
+                done = True
+
+            # Check for premature END
+
+            elif action == self.end_state and len(visited_actions) < len(self.actions) - 1:
+                if not self.update_valid_transitions == []:
+                    if state in self.update_valid_transitions.keys():
+                        if not action in self.update_valid_transitions[state]:
+                            reward_t += -10.0
+                        else:
+                            reward_t += 1.0
+                        done = True
+
+            # Check for successful completion
+            elif action == self.end_state and len(visited_actions) == len(self.actions) - 1:
+                reward_t += 10.0
+                done = True
+
+            # Check for invalid transition
+            elif not state == self.end_state:
+                if not self.update_valid_transitions == []:
+                    if state in self.update_valid_transitions.keys():
+                        if action not in self.update_valid_transitions[state]:
+                            reward_t += -1.0
+                            done = True
+                        else:
+                            reward_t += 1.0
+
+            # if t == self.max_steps-1:
+            #     if action == self.end_state:
+            #         if episode_reward['reward']==1:
+            #             reward_t += 10
+            #             # at the ebd of the sequence , LLM indicates good sequence, the goal is reached then the reward is high
+            #         else:
+            #             reward_t += -10
+            #
+            # else:
+            #
+            #     if t==len(episode)-1 or action == self.end_state:
+            #         reward_t += -10
+            #     if action in visited_list[0:t]: # state taken twice , the same action taken twice
+            #         reward_t += -1
+            #     elif state in state_transitions:
+            #         reward_t += -1  # not ligall transition
 
             episode_copy[t] = (state, action, reward_t, act_prob)
 

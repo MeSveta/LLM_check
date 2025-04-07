@@ -58,9 +58,9 @@ class GPTFeedbackConnector:
         actions_text = [str(i)+'-' + actions[str(i)] for i in action_sequence]
         #actions_text = [str(i) for i in action_sequence]
         prompt = (
-            f"Given the following goal: '{goal}', and the following actions:\n"
+            f"Given the following goal: '{goal}', and the following bag of actions:\n"
             f"{actions}\n"
-            "Evaluate the following sequence of actions for achieving a cooking goal:\n"
+            "Evaluate the following sequence of actions for achieving the goal, the sequence should include all bag actions:\n"
             f"{actions_text}\n"
             "The values at the beginning of the actions and sequence is dot language. Is the sequence chronologically reasonable?  Return the answer in JSON format as follows:\n"
             "{\n"

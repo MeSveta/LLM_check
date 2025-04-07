@@ -20,6 +20,9 @@ env:
   constraints_flag: True
   reward_type: "dense"
 
+results:
+  save_dir: "C:/Users/Sveta/PycharmProjects/Results/PPO_RL"
+
 
 
 

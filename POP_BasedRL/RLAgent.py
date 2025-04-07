@@ -75,8 +75,14 @@ class RLAgent:
 
         if self.agent_config['train']['mode'] == 'MCC':
             while not done:
+                print(state)
                 action, act_prob = self.create_behavior_policy(state)
-                next_state, reward, done, _ = env.step(action)
+
+                if env.reward_type=='LLM':
+                    next_state, reward, done, _ = env.step_LLM(action)
+                else:
+                    next_state, reward, done, _ = env.step_MCC(action)
+
                 episode.append((state, action, reward, act_prob))
                 state = next_state
 
@@ -173,17 +179,30 @@ class RLAgent:
         for episode_index in range(num_episodes):
             done = False
             episode = []
-            while done:
-                state = env.reset()
+            state = env.reset()
+            G=0
+            W=1
+            while not done:
+                if state!=env.state:
+                    y=1
                 action, act_prob = self.create_behavior_policy(state)
+                if action == env.end_state:
+                     y = 1
                 next_state, reward, done, _ = env.step(action)
 
-                action_next, [] = self.create_behavior_policy(next_state)
-                self.Q[state][action] += self.alpha * (reward + self.gamma*self.Q[next_state][action_next]-self.Q[state][action])
+
+                if done:
+                    target = reward
+                else:
+                    action_next, dontcare = self.create_behavior_policy(next_state)
+                    target = reward + self.gamma * self.Q[next_state][action_next]
+
+                self.Q[state][action] += self.alpha * (target-self.Q[state][action])
 
                 # Improve policy (greedy update)
                 self.target_policy[state] = self.max_argmax(self.Q[state])
                 episode.append((state, action, reward, act_prob))
+                state = next_state
 
             self.reward_hist[episode_index] = np.sum([ii[2] for ii in episode])
             action_sequence = [episode_i[0] for episode_i in episode]
@@ -191,5 +210,72 @@ class RLAgent:
                 print(
                     f'Episode: {episode_index}: {action_sequence}, reward: {self.reward_hist[episode_index]}, epsilon:{self.behavior_policy_epsilon}')
 
+    def train_nSarsa(self, env, n=1, num_episodes=1000):
+        for episode_index in range(num_episodes):
+            state = env.reset()
+            decay_rate = 0.01
 
+            # Epsilon decay every 1000 episodes
+            # if episode_index % 1000 == 0:
+            #self.behavior_policy_epsilon = max(0.1, 1 * np.exp(-decay_rate * episode_index))
+
+            action, act_prob = self.create_behavior_policy(state)
+            t = 0
+            T = float("inf")
+            buffer = []
+            G = 0.0
+
+            self.reward_hist[episode_index] = 0.0
+
+            while True:
+                # Step in environment
+                if t < T:
+                    next_state, reward, done, _ = env.step(action)
+                    self.reward_hist[episode_index] += reward
+
+                    if done:
+                        T = t + 1
+                        next_action, next_act_prob = None, 1.0
+                    else:
+                        next_action, next_act_prob = self.create_behavior_policy(next_state)
+
+                    buffer.append((state, action, reward, act_prob))
+
+                tau = t - n + 1
+                if tau >= 0:
+
+                    W = 1.0
+
+                    for i in range(tau, min(tau + n, T)):
+                        _, _, r_i, _ = buffer[i]
+                        G += (self.gamma ** (i - tau)) * r_i
+
+                    # Safe bootstrap
+                    if tau + n < T and tau + n < len(buffer):
+                        s_n, a_n, _, act_prob_n = buffer[tau + n]
+                        G += (self.gamma ** n) * self.Q[s_n][a_n]
+                        if self.target_policy[s_n] != a_n:
+                            W = 0.0
+                        else:
+                            W *= 1 / act_prob_n
+
+                    # Final update (even without bootstrapping)
+                    if tau < len(buffer):  #
+                        s_tau, a_tau, _, _ = buffer[tau]
+                        self.Q[s_tau][a_tau] += self.alpha * W * (G - self.Q[s_tau][a_tau])
+                        self.target_policy[s_tau] = self.max_argmax(self.Q[s_tau])
+
+                    if tau == T - 1:
+                        break
+
+
+                state = next_state
+                env.state = state
+                action = next_action
+                act_prob = next_act_prob
+                t += 1
+
+            # Optional: monitor progress
+            if episode_index % 100 == 0:
+                print(f"Episode {episode_index}, Total Reward: {self.reward_hist[episode_index]:.2f}, Epsilon: {self.behavior_policy_epsilon:.4f}")
 

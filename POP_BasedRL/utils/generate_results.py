@@ -49,10 +49,10 @@ class PlotResults:
 
     def plot_rewards(self):
         y=[]
-        save_file = self.save_dir+'/plots/rewards_'+self.env.goal +'.png'
+        save_file = self.save_dir+'/plots/Sarsa_n3_rewards_'+self.env.goal +'.png'
 
         # Apply moving average smoothing
-        window_size = 1000
+        window_size = 10000
         if len(self.rewards)==2:
             for i in range(np.size(self.rewards,axis = 1)):
                 y.append(self.rewards[i])

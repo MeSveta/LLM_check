@@ -84,6 +84,7 @@ class GPTFeedbackConnector:
             parsed['bad transitions'] = parsed_recheck['confirmed_bad_transitions']
             print("bad transitions")
             print(parsed['bad transitions'])
+            print(f"Explanation: {parsed['explanation']}\n")
             return parsed
 
         except json.JSONDecodeError as e:
@@ -102,9 +103,9 @@ class GPTFeedbackConnector:
 
         actions_text = [actions[str(i)] for i in sequence]
         prompt = (
-            f"Given the goal: '{goal}' and the following actions:\n"
+            f"Given the goal: '{goal}' and the following symbolic representation of actions:\n"
             f"{actions}\n\n"
-            f"The sequence of actions (in dot IDs) was: {sequence}\n"
+            f"The current sequence of actions (in dot IDs) was: {sequence}\n"
             f"The corresponding action names are: {actions_text}\n"
             f"The following transitions were marked as 'bad': {bad_transitions}\n\n"
             "Please recheck each bad transition one by one and evaluate if they are truly out of order.\n"

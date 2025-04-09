@@ -5,12 +5,13 @@ import numpy as np
 
 
 class PlotResults:
-    def __init__(self, env, Q, rewards, save_dir):
+    def __init__(self, env, Q, rewards, save_dir, num_episodes=10000):
         self.env = env
         self.Q = Q
         #self.target_policy = self.generate_optimal_policy()
         self.rewards = rewards
         self.save_dir = save_dir
+        self.window_size = np.mod(num_episodes,100)
 
     def generate_optimal_policy(self):
         target_policy = {}
@@ -49,10 +50,10 @@ class PlotResults:
 
     def plot_rewards(self):
         y=[]
-        save_file = self.save_dir+'/plots/Sarsa_n3_rewards_'+self.env.goal +'.png'
+        save_file = self.save_dir+'/plots/MCC_rewards_'+self.env.goal +'.png'
 
         # Apply moving average smoothing
-        window_size = 10000
+        window_size = self.window_size
         if len(self.rewards)==2:
             for i in range(np.size(self.rewards,axis = 1)):
                 y.append(self.rewards[i])
@@ -67,8 +68,12 @@ class PlotResults:
         else:
             y = self.rewards[0]
             x = np.arange(len(y))
-            y1_smooth = self.moving_average(y, window_size)
-            x_smooth = x[:len(y1_smooth)]
+            if window_size==0:
+                y1_smooth = y
+                x_smooth = x
+            else:
+                y1_smooth = self.moving_average(y, window_size)
+                x_smooth = x[:len(y1_smooth)]
             # Plot
             plt.figure(figsize=(10, 6))
             plt.plot(x_smooth, y1_smooth, 'b-', label="epsilon=0.2", alpha=0.8)

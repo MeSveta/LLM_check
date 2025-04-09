@@ -201,6 +201,12 @@ class GoalBasedEnvironment(gym.Env):
 
         valid_transitions = copy.deepcopy(self.valid_transitions)
         valid_transitions_updated = copy.deepcopy(valid_transitions)
+        converted_dict = {int(k): v for k, v in self.actions.items()}
+        for ii in converted_dict.keys():
+            if ii not in valid_transitions_updated.keys() and ii!=self.end_state:
+                valid_transitions_updated[ii] = []
+
+
         # First, identify states with multiple transitions
         for state, transitions in valid_transitions.items():
             if len(transitions) > 1:
@@ -262,6 +268,11 @@ class GoalBasedEnvironment(gym.Env):
         episode_copy = episode.copy()
 
         bad_transitions = episode_reward['bad transitions']
+        if episode_reward['reward']==0:
+            sparse_reward = -10
+        else:
+            sparse_reward = 10
+
 
         if episode_reward['reward']==1 and bad_transitions==[]:
             good_transitions = [[i[0],i[1]] for i in episode]
@@ -294,7 +305,7 @@ class GoalBasedEnvironment(gym.Env):
 
             # Check for premature END
 
-            elif action == self.end_state and len(visited_actions) < len(self.actions) - 1:
+            elif action == self.end_state and len(visited_actions) <= len(self.actions):
                 if not self.update_valid_transitions == []:
                     if state in self.update_valid_transitions.keys():
                         if not action in self.update_valid_transitions[state]:
@@ -337,7 +348,7 @@ class GoalBasedEnvironment(gym.Env):
 
             episode_copy[t] = (state, action, reward_t, act_prob)
 
-        return episode_copy
+        return episode_copy, sparse_reward
 
     def filter_transitions_by_sequence(self,transitions, sequence):
         """

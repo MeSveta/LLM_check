@@ -74,6 +74,7 @@ class RLAgent:
 
 
         if self.agent_config['train']['mode'] == 'MCC':
+            sparse_reward = []
             while not done:
                 print(state)
                 action, act_prob = self.create_behavior_policy(state)
@@ -88,7 +89,7 @@ class RLAgent:
 
             if done and env.reward_type=='LLM':
                 # send the sequence to LLM to check the final sequence and sub transitions
-                episode_copy = env.compute_reward(episode)
+                episode_copy, sparse_reward = env.compute_reward(episode)
                 episode = episode_copy
         elif self.agent_config['train']['mode'] == 'TD':
                 action, act_prob = self.create_behavior_policy(state)
@@ -97,7 +98,7 @@ class RLAgent:
                 state = next_state
 
 
-        return episode
+        return episode,sparse_reward
 
     def MCC_update(self,episode,W,G):
         for t in reversed(range(len(episode))):
@@ -162,8 +163,8 @@ class RLAgent:
     def train_MCC(self, env, num_episodes=10000):
         """Trains the agent using Monte Carlo with importance sampling."""
         for episode_index in range(num_episodes):
-            episode = self.generate_episode(env)
-            G = 0
+            episode, sparse_reward = self.generate_episode(env)
+            G = sparse_reward
             W = 1
 
             self.reward_hist[episode_index] = np.sum([ii[2] for ii in episode])

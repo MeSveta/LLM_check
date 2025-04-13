@@ -19,7 +19,7 @@ class CustomEncoder(json.JSONEncoder):
 def main(config):
     json_dir = config['env']['json_path']
     save_dir = config['results']['save_dir']
-    num_episodes = 10
+    num_episodes = 100
     if os.path.isdir(json_dir):
         for filename in os.listdir(json_dir):
             if filename.endswith('.json'):

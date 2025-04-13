@@ -5,13 +5,13 @@ import numpy as np
 
 
 class PlotResults:
-    def __init__(self, env, Q, rewards, save_dir, num_episodes=10000):
+    def __init__(self, env, Q, rewards, save_dir, num_episodes=5000):
         self.env = env
         self.Q = Q
         #self.target_policy = self.generate_optimal_policy()
         self.rewards = rewards
         self.save_dir = save_dir
-        self.window_size = np.mod(num_episodes,100)
+        self.window_size = min(100,num_episodes//100)
 
     def generate_optimal_policy(self):
         target_policy = {}
@@ -81,7 +81,7 @@ class PlotResults:
             plt.ylabel("Rewards")
             plt.legend()
             plt.grid(True)
-            plt.ylim([-20, 20])
+            plt.ylim([-20, 100])
             plt.title("MCC reward")
             plt.savefig(save_file)
             plt.show()

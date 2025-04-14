@@ -16,8 +16,8 @@ env:
   json_path: "C:/Users/Sveta/PycharmProjects/data/Cook/LLM"
   reward_per_step: -0.1
   reward_final: 1.0
-  constraints_flag: False
-  reward_type: "LLM"
+  constraints_flag: True
+  reward_type: "standard" #"LLM"
 
 results:
   save_dir: "C:/Users/Sveta/PycharmProjects/Results/PPO_RL/LLM"

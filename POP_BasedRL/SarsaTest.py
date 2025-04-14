@@ -3,6 +3,8 @@ import numpy as np
 import gym
 import json
 from collections import defaultdict
+import yaml
+import os
 
 # === Load your GoalBasedEnvironment ===
 from GoalBasedEnvironment import GoalBasedEnvironment
@@ -11,7 +13,13 @@ import matplotlib.pyplot as plt
 from collections import Counter
 
 
-
+class CustomEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()  # Convert NumPy arrays to lists
+        elif isinstance(obj, np.int64):
+            return int(obj)  # Convert np.int64 to regular int
+        return super().default(obj)
 # === SARSA Agent ===
 class TabularSARSAAgent:
     def __init__(self, n_states, n_actions, alpha=0.1, gamma=0.99, epsilon=0.2):
@@ -27,7 +35,7 @@ class TabularSARSAAgent:
 
     def generate_target_policy(self):
         """Returns the greedy policy based on Q-values."""
-        return {state: self.max_argmax(self.q_table[state]) for state in range(self.n_actions-1)}
+        return {state: self.max_argmax(self.q_table[int(state)]) for state in range(self.n_actions-1)}
 
 
     def print_policy(self):
@@ -97,7 +105,7 @@ def rl_step(env, action):
 
 
 # === Training Loop ===
-def train_sarsa(env_config, json_path, num_episodes=10000):
+def train_sarsa(env_config, json_path, num_episodes=5000):
     rewards = []
     reason_log = []
     success_count = 0
@@ -178,10 +186,11 @@ def plot_metrics(rewards, reason_log, window=100):
 if __name__ == "__main__":
     with open("POP_RL_config.yaml", "r") as f:
         config = yaml.safe_load(f)
-    env_config = {
-        "constraints_flag": True,
-        "reward_type": "standard"  # or "LLM" if using GPTFeedbackConnector
-    }
+    env_config = config['env']
+    # #{
+    #     "constraints_flag": True,
+    #     "reward_type": "standard"  # or "LLM" if using GPTFeedbackConnector
+    # }
     json_dir = config['env']['json_path']
     save_dir = config['results']['save_dir']
 
@@ -189,31 +198,44 @@ if __name__ == "__main__":
         for filename in os.listdir(json_dir):
             if filename.endswith('.json'):
                 full_path = os.path.join(json_dir, filename)
-            config_path = full_path
-            with open(config_path, 'r') as file:
-                data = json.load(file)
-            # Path to your JSON file
+            json_path = full_path
+            # with open(json_path, 'r') as file:
+            #     data = json.load(file)
+            # # Path to your JSON file
+
+    #json_path = "C:/Users/spaste01/Documents/Research/data/blenderbananapancakes.json"  # replace with actual path
+            env, agent, reward_log = train_sarsa(env_config, json_path)
+            rewards = [reward_log]
+            gen_res = PlotResults(env=env, Q=agent.q_table, rewards=rewards, save_dir=config["results"]["save_dir"])
 
 
+            # Saving and plotting results
+            res = {}
+            res['Q'] = {int(k): list(v) for k, v in agent.q_table.items()}
+            res['target_policy'] = agent.generate_target_policy()
+            res['rewards_hist'] = reward_log
+            res['env_constrains'] = []
+            res['res_constrains_updated'] = env.update_valid_transitions
+            res['goal'] = env.goal
+            res['steps'] = env.actions
 
+            file_name = 'Sarsa_' + env.goal + '.json'
+            with open(file_name, "w") as f:
+                json.dump(res, f, indent=4, cls=CustomEncoder)
 
-    json_path = "C:/Users/spaste01/Documents/Research/data/blenderbananapancakes.json"  # replace with actual path
-    env, agent, reward_log = train_sarsa(env_config, json_path)
-    rewards = [reward_log]
-    gen_res = PlotResults(env=env, Q=agent.q_table, rewards=rewards, save_dir="C:/Users/spaste01/PycharmProjects/Results/PPO_RL/LLM")
-    gen_res.plot_rewards()
+            gen_res.plot_rewards()
 
-    # Print learned policy
-    policy = agent.generate_target_policy()
-    steps = env.actions
-    print("\nLearned Policy:")
-    state_u = 0
-    for state, action in policy.items():
-        state = state_u
-        action = policy[state]
-        print(f"State {state} -> Action {action} ({steps[str(action)]})")
-        state_u = action
-        if state_u == env.end_state:
-            break
+            # Print learned policy
+            policy = agent.generate_target_policy()
+            steps = env.actions
+            print("\nLearned Policy:")
+            state_u = 0
+            for state, action in policy.items():
+                state = state_u
+                action = policy[state]
+                print(f"State {state} -> Action {action} ({steps[str(action)]})")
+                state_u = action
+                if state_u == env.end_state:
+                    break
 
 y=1

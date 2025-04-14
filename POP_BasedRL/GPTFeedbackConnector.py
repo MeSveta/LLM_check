@@ -66,7 +66,7 @@ class GPTFeedbackConnector:
             "{\n"
             "  \"reward\": 1 or 0,\n"
             "  \"good transitions\": [list only in order transition in the sequence at dot language, focus only on the right next transition whether it logical. if the sequence [0,4,7,8] and 4 can be right after 0 then [0,4] is in order transition. no "" before the numbers. The format [[0,4],]],\n"
-            "  \"bad transitions\":  [list only out of order transition in the sequence at dot language, focus only on the right next transition whether it logical or not. if the sequence [0,4,7,8] and 4 cant be right after 0 then [0,4] is out of order transition. no "" before the numbers. The format [[0,4],]],\n"
+            "  \"bad transitions\":  [list only out of order transition in the sequence at dot language, focus only on the right next transition/action Not the following after whether it logical or not. if the sequence [0,4,7,8] and 4 cant be right after 0 then [0,4] is out of order transition. no "" before the numbers. The format [[0,4],]],\n"
             "  \"explanation\": \"Your reasoning here\"\n"
             "}"
         )
@@ -85,6 +85,8 @@ class GPTFeedbackConnector:
             print("bad transitions")
             print(parsed['bad transitions'])
             print(f"Explanation: {parsed['explanation']}\n")
+            print(f"reward: {parsed['reward']}\n")
+
             return parsed
 
         except json.JSONDecodeError as e:

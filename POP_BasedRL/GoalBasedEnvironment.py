@@ -216,8 +216,14 @@ class GoalBasedEnvironment(gym.Env):
                         valid_transitions_updated[t] = []
                     # Ensure all other transitions are connected
                     for other in transitions:
-                        if other != t and other not in valid_transitions[t]:
-                            valid_transitions_updated[t].append(other)
+                            if other != t:
+                                if t in valid_transitions.keys():
+                                    if other not in valid_transitions[t]:
+                                        valid_transitions_updated[t].append(other)
+                                else:
+                                    valid_transitions_updated[t].append(other)
+
+
 
         return valid_transitions_updated
 
@@ -309,7 +315,7 @@ class GoalBasedEnvironment(gym.Env):
                 if not self.update_valid_transitions == []:
                     if state in self.update_valid_transitions.keys():
                         if not action in self.update_valid_transitions[state]:
-                            reward_t += -10.0
+                            reward_t += -1.0
                         else:
                             reward_t += 1.0
                         done = True

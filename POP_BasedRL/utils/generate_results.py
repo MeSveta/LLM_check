@@ -50,7 +50,8 @@ class PlotResults:
 
     def plot_rewards(self):
         y=[]
-        save_file = self.save_dir+'/plots/MCC_rewards_'+self.env.goal +'.png'
+        save_file = self.save_dir+'/plots/SARSA_rewards_'+self.env.goal +'.png'
+        title = 'Rewards -  Sarsa constrain based ' +self.env.goal
 
         # Apply moving average smoothing
         window_size = self.window_size
@@ -82,7 +83,7 @@ class PlotResults:
             plt.legend()
             plt.grid(True)
             plt.ylim([-20, 100])
-            plt.title("MCC reward")
+            plt.title(title)
             plt.savefig(save_file)
             plt.show()
 

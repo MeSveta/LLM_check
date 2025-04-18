@@ -107,13 +107,13 @@ def rl_step(env, action):
 
 
 # === Training Loop ===
-def train_sarsa(env_config, json_path, num_episodes=5000):
+def train_sarsa(env, json_path, num_episodes=5000):
     rewards = []
     reason_log = []
     success_count = 0
 
 
-    env = GoalBasedEnvironment(env_config, json_path)
+
     n_states = len(env.actions)
     n_actions = env.action_space.n
 
@@ -206,7 +206,8 @@ if __name__ == "__main__":
             # # Path to your JSON file
 
     #json_path = "C:/Users/spaste01/Documents/Research/data/blenderbananapancakes.json"  # replace with actual path
-            env, agent, reward_log = train_sarsa(env_config, json_path)
+            env = GoalBasedEnvironment(env_config, json_path)
+            agent, reward_log = train_sarsa(env, json_path)
             rewards = [reward_log]
             gen_res = PlotResults(env=env, Q=agent.q_table, rewards=rewards, save_dir=config["results"]["save_dir"])
 

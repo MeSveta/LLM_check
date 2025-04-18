@@ -45,6 +45,88 @@ class GPTFeedbackConnector:
             "explanation": "Invalid constraints format or action values after multiple attempts."
         }
 
+    def clean_json_like_string(self,raw):
+        import re
+
+        if not raw or not isinstance(raw, str):
+            return ""
+
+        raw = raw.strip()
+
+        # Remove markdown block
+        if raw.startswith("```"):
+            raw = re.sub(r"^```(?:json)?\s*", "", raw)  # remove ```json or ```
+            raw = re.sub(r"\s*```$", "", raw)  # remove ending ```
+
+        return raw.strip()
+
+    def evaluate_batch(self, action_sequence, actions, goal):
+        """
+        Evaluate a final sequence of actions for chronological reasonableness.
+        Return: {reward: 1 or 0, transitions: [problematic transitions] in dot format}
+        """
+
+        """
+         Evaluate a final sequence of actions for chronological reasonableness.
+         Return: {reward: 1 or 0, transitions: [...], explanation: "..."}
+         """
+        #actions_text = [str(i)+'-' + actions[str(i)] for i in action_sequence]
+        #actions_text = [str(i) for i in action_sequence]
+        prompt = (f"""
+        Given the following goal: '{goal}', and the following bag of actions:
+        {actions}
+        
+        Below are multiple sequences of actions. Each sequence should be evaluated for whether it reasonably and logically leads to achieving the goal,
+        considering the required ordering of actions, dependencies, and logical transitions based on typical task structure.
+        If a sequence makes logical chronological sense to achieve the goal, return 1. Otherwise, return 0.
+        
+        🔧 Return the result in valid JSON format, using double quotes (") only. Do not use single quotes (') around keys or values.
+        
+        Respond exactly in the following JSON format:
+        {{
+          "sequence_scores": [
+            {{"sequence": [list of steps], "reward": 0 or 1}},
+            ...
+          ]
+        }}
+        
+        Here are the sequences to evaluate:
+        """)
+
+        for seq in action_sequence:
+            actions_text = [actions[str(i)] for i in seq]
+            prompt += f"- {actions_text}\n"
+
+        raw_response = self._query_gpt(prompt)
+
+        # Attempt to sanitize and parse the response
+        try:
+            # Sometimes GPT wraps the response in a code block, strip it
+            if raw_response.startswith("```json"):
+                raw_response = raw_response.strip("```json").strip("```").strip()
+
+            clean_response = self.clean_json_like_string(raw_response)
+
+
+            parsed = json.loads(clean_response)
+            # parsed_recheck = self.recheck_bad_transitions(goal, actions, action_sequence, parsed['bad transitions'])
+            # parsed['bad transitions'] = parsed_recheck['confirmed_bad_transitions']
+            # print("bad transitions")
+            # print(parsed['bad transitions'])
+            # print(f"Explanation: {parsed['explanation']}\n")
+            # print(f"reward: {parsed['reward']}\n")
+
+            return parsed
+
+        except json.JSONDecodeError as e:
+            print("❌ Failed to parse GPT response as JSON. Response was:")
+            print(raw_response)
+            return {
+                "reward": 0,
+                "transitions": [],
+                "explanation": "Failed to parse GPT output"
+            }
+
     def evaluate_sequence(self, action_sequence, actions, goal):
         """
         Evaluate a final sequence of actions for chronological reasonableness.

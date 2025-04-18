@@ -50,8 +50,8 @@ class PlotResults:
 
     def plot_rewards(self):
         y=[]
-        save_file = self.save_dir+'/plots/SARSA_rewards_'+self.env.goal +'.png'
-        title = 'Rewards -  Sarsa constrain based ' +self.env.goal
+        save_file = self.save_dir+'/plots/MCC_batch_rewards_'+self.env.goal +'.png'
+        title = 'Rewards -  MCC batch with seq init ' +self.env.goal
 
         # Apply moving average smoothing
         window_size = self.window_size
@@ -73,16 +73,20 @@ class PlotResults:
                 y1_smooth = y
                 x_smooth = x
             else:
-                y1_smooth = self.moving_average(y, window_size)
-                x_smooth = x[:len(y1_smooth)]
+                if len(y)>window_size*20:
+                    y1_smooth = self.moving_average(y, window_size)
+                    x_smooth = x[:len(y1_smooth)]
+                else:
+                    y1_smooth = y
+                    x_smooth = x
             # Plot
             plt.figure(figsize=(10, 6))
-            plt.plot(x_smooth, y1_smooth, 'b-', label="epsilon=0.2", alpha=0.8)
+            plt.plot(x_smooth, y1_smooth, 'b-o', label="epsilon=0.2", alpha=0.8)
             plt.xlabel("Episodes")
             plt.ylabel("Rewards")
             plt.legend()
             plt.grid(True)
-            plt.ylim([-20, 100])
+            plt.ylim([-100, 100])
             plt.title(title)
             plt.savefig(save_file)
             plt.show()

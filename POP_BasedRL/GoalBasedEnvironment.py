@@ -264,13 +264,18 @@ class GoalBasedEnvironment(gym.Env):
         self.visited_actions = [0]
         return self.current_step
 
-    def compute_reward(self, episode):
+    def compute_reward(self, episodes):
         """Sparse reward applied only when reaching the END state."""
-
         connector = GPTFeedbackConnector()
-        action_sequence = [episode_i[0] for episode_i in episode]
-        action_sequence.append(episode[-1][1])
-        episode_reward = connector.evaluate_sequence(action_sequence= action_sequence, actions = self.actions, goal = self.goal)
+        action_sequence_batch = []
+        for episode_from_episodes in episodes:
+            episode = episode_from_episodes
+            action_sequence = [episode_i[0] for episode_i in episode]
+            action_sequence.append(episode[-1][1])
+            action_sequence_batch.append(action_sequence)
+        episode_reward = connector.evaluate_batch(action_sequence= action_sequence_batch, actions = self.actions, goal = self.goal)
+        if len(episodes)>0:
+            return episode_reward['sequence_scores'], 0
         episode_copy = episode.copy()
 
         bad_transitions = episode_reward['bad transitions']
@@ -286,6 +291,7 @@ class GoalBasedEnvironment(gym.Env):
             good_transitions = episode_reward['good transitions']
         self.valid_transitions = {i[0]:[i[1]] for i in good_transitions}
         self.update_valid_transitions = self.update_valid_transitions_func()
+        self.preconditions = self.extract_preconditions_from_transitions()
         bad_transitions_filtered = self.filter_transitions_by_sequence(bad_transitions, action_sequence)
         filtered_bad_tr = [tr for tr in bad_transitions_filtered if tr not in good_transitions]
         state_transitions = [state_i[0] for state_i in filtered_bad_tr]
@@ -293,66 +299,52 @@ class GoalBasedEnvironment(gym.Env):
         # filter out from bad_transitions the goog_transitions (LLM might wrong
         visited_list = list(self.visited_actions)
         for t in reversed(range(len(episode))):
-            reward_t = 0
-            visited_actions = []
+            reward = 0.0
+            done = False
+            info = {}
+            ep_i = episode[t]
+            action = ep_i[1]
+            state = ep_i[0]
+            self.visited_actions = visited_list[0:t]
+            self.steps_taken = t-1
 
-            visited_actions = visited_list[0:t+1]
-            state, action, reward, act_prob = episode[t]
-
-            # Check for repeated actions
-            if action in visited_actions:
-                reward_t += -5.0
+            if action in self.visited_actions:
+                reward = -1.0
                 done = True
+                info["reason"] = "repeated action"
 
-            # Step limit reached
-            elif t >= self.max_steps:
-                reward_t += -5.0
+            elif self.steps_taken >= self.max_steps:
+                reward = -5.0
                 done = True
+                info["reason"] = "step limit reached"
 
-            # Check for premature END
-
-            elif action == self.end_state and len(visited_actions) <= len(self.actions):
-                if not self.update_valid_transitions == []:
-                    if state in self.update_valid_transitions.keys():
-                        if not action in self.update_valid_transitions[state]:
-                            reward_t += -1.0
-                        else:
-                            reward_t += 1.0
-                        done = True
-
-            # Check for successful completion
-            elif action == self.end_state and len(visited_actions) == len(self.actions) - 1:
-                reward_t += 10.0
+            elif action == self.end_state and len(self.visited_actions) < len(self.actions) - 1:
+                reward = -10.0
                 done = True
+                info["reason"] = "premature END"
 
-            # Check for invalid transition
+            elif action == self.end_state and len(self.visited_actions) == len(self.actions) - 1:
+                reward = 10.0
+                done = True
+                info["reason"] = "successful completion"
+
             elif not state == self.end_state:
-                if not self.update_valid_transitions == []:
-                    if state in self.update_valid_transitions.keys():
-                        if action not in self.update_valid_transitions[state]:
-                            reward_t += -1.0
-                            done = True
-                        else:
-                            reward_t += 1.0
+                if action not in self.update_valid_transitions.get(state, []):
+                    reward = -5.0
+                    done = True
+                    info["reason"] = "invalid transition"
+                else:
+                    required = self.preconditions.get(action, set())
+                    if not required.issubset(self.visited_actions):
+                        reward = -5.0
+                        done = True
+                        info["reason"] = f"violated preconditions for action {action}"
+                        info["missing"] = list(required - set(self.visited_actions))
+                    else:
+                        reward = 6.0
+                        info["reason"] = "valid logical transition"
 
-            # if t == self.max_steps-1:
-            #     if action == self.end_state:
-            #         if episode_reward['reward']==1:
-            #             reward_t += 10
-            #             # at the ebd of the sequence , LLM indicates good sequence, the goal is reached then the reward is high
-            #         else:
-            #             reward_t += -10
-            #
-            # else:
-            #
-            #     if t==len(episode)-1 or action == self.end_state:
-            #         reward_t += -10
-            #     if action in visited_list[0:t]: # state taken twice , the same action taken twice
-            #         reward_t += -1
-            #     elif state in state_transitions:
-            #         reward_t += -1  # not ligall transition
-
-            episode_copy[t] = (state, action, reward_t, act_prob)
+            episode_copy[t] = (state, action, reward, [])
 
         return episode_copy, sparse_reward
 

@@ -19,7 +19,7 @@ class CustomEncoder(json.JSONEncoder):
 def main(config):
     json_dir = config['env']['json_path']
     save_dir = config['results']['save_dir']
-    num_episodes = 100
+    num_episodes = 30
     if os.path.isdir(json_dir):
         for filename in os.listdir(json_dir):
             if filename.endswith('.json'):
@@ -36,10 +36,10 @@ def main(config):
             num_states = num_actions  # Assuming one-to-one mapping of steps to state ids
 
             # Create the environment
-            env_MCC = GoalBasedEnvironment(env_config = config['env'],file_path = full_path)
+            env = GoalBasedEnvironment(env_config = config['env'],file_path = full_path)
             #env_TD = GoalBasedEnvironment(env_config=config['env'], file_path=full_path)
-            agent_MCC = RLAgent(agent_config = config['agent'],init_sequence_path = full_path,
-                constraints=env_MCC.valid_transitions,
+            agent = RLAgent(agent_config = config['agent'],init_sequence_path = full_path,
+                constraints=env.valid_transitions,
                 state_space_size=num_states,
                 action_space_size=num_actions,
                 num_episodes=num_episodes
@@ -52,19 +52,19 @@ def main(config):
             #                     num_episodes=num_episodes
             #                     )
 
-            agent_MCC.train_MCC(env_MCC, num_episodes=num_episodes)
+            agent.train_LLM(env, full_path, num_episodes=num_episodes)
             #agent_TD.train_nSarsa(env_TD, num_episodes=num_episodes)
             if config['agent']['train']['mode']=='MCC':
                 res = {}
-                res['Q'] = agent_MCC.Q
-                res['target_policy'] = agent_MCC.target_policy
-                res['rewards_hist'] = agent_MCC.reward_hist
-                res['env_constrains'] = env_MCC.valid_transitions
-                res['res_constrains_updated'] = env_MCC.update_valid_transitions
-                res['goal'] = env_MCC.goal
-                res['steps'] = env_MCC.actions
+                res['Q'] = agent.Q
+                res['target_policy'] = agent.target_policy
+                res['rewards_hist'] = agent.reward_hist
+                res['env_constrains'] = env.valid_transitions
+                res['res_constrains_updated'] = env.update_valid_transitions
+                res['goal'] = env.goal
+                res['steps'] = env.actions
 
-                file_name = 'MCC_LLM_' + env_MCC.goal + '.json'
+                file_name = 'MCC_LLM_' + env.goal + '.json'
                 with open(file_name, "w") as f:
                     json.dump(res, f, indent=4, cls=CustomEncoder)
 
@@ -84,8 +84,8 @@ def main(config):
 
 
             # Print learned policy
-            policy = agent_MCC.generate_target_policy()
-            policy = agent_MCC.target_policy
+            policy = agent.generate_target_policy()
+            #policy = agent.target_policy
             print("\nLearned Policy:")
             state_u = 0
             for state, action in policy.items():
@@ -93,12 +93,12 @@ def main(config):
                 action = policy[state]
                 print(f"State {state} -> Action {action} ({steps[str(action)]})")
                 state_u = action
-                if state_u==env_MCC.end_state:
+                if state_u==env.end_state:
                     break
 
             #prepare for plot
-            rewards = [agent_MCC.reward_hist]
-            gen_res = PlotResults(env = env_MCC, Q = agent_MCC.Q, rewards = rewards, save_dir = save_dir)
+            rewards = [agent.reward_hist]
+            gen_res = PlotResults(env = env, Q = agent.Q, rewards = rewards, save_dir = save_dir)
             gen_res.plot_rewards()
 
 

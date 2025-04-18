@@ -4,8 +4,9 @@ agent:
   epsilon: 0.2
   num_episodes: 1000
   Q_init: 'labeled_sequence'  # Q possible be updated by one labeled sequence to reach the goal, the sequence generated ones from labeled constrains
-  init_sequence_path: "C:/Users/Sveta/PycharmProjects/data/Cook/LLM"
+  init_sequence_path: "C:/Users/spaste01/Documents/Research/data"
   train:
+    batch_size: 10
     alpha: 0.1
     gamma: 0.9
     behavior_policy_epsilon: 0.2
@@ -13,14 +14,14 @@ agent:
     mode: "MCC"
 
 env:
-  json_path: "C:/Users/Sveta/PycharmProjects/data/Cook/LLM"
+  json_path: "C:/Users/spaste01/Documents/Research/data"
   reward_per_step: -0.1
   reward_final: 1.0
-  constraints_flag: True
-  reward_type: "standard" #"LLM"
+  constraints_flag: False
+  reward_type: "LLM"
 
 results:
-  save_dir: "C:/Users/Sveta/PycharmProjects/Results/PPO_RL/LLM"
+  save_dir: "C:/Users/spaste01/PycharmProjects/Results/PPO_RL/LLM"
 
 
 

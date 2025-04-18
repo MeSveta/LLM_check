@@ -214,13 +214,31 @@ if __name__ == "__main__":
 
             # Saving and plotting results
             res = {}
+
+            # Print learned policy
+            policy = agent.generate_target_policy()
+            policy_seq = {}
+            steps = env.actions
+            print("\nLearned Policy:")
+            state_u = 0
+            for ii,(state, action) in enumerate(policy.items()):
+                state = state_u
+                action = policy[state]
+                print(f"State {state} -> Action {action} ({steps[str(action)]})")
+                policy_seq[ii] = f"State {state} -> Action {action} ({steps[str(action)]})"
+                state_u = action
+                if state_u == env.end_state:
+                    break
+
+
             res['Q'] = {int(k): list(v) for k, v in agent.q_table.items()}
-            res['target_policy'] = agent.generate_target_policy()
             res['rewards_hist'] = reward_log
             res['env_constrains'] = []
             res['res_constrains_updated'] = env.update_valid_transitions
             res['goal'] = env.goal
             res['steps'] = env.actions
+            res['target_policy'] = policy
+            res['target_policy_sequence'] = policy_seq
 
             file_name = 'Sarsa_' + env.goal + '.json'
             with open(file_name, "w") as f:
@@ -228,17 +246,6 @@ if __name__ == "__main__":
 
             gen_res.plot_rewards()
 
-            # Print learned policy
-            policy = agent.generate_target_policy()
-            steps = env.actions
-            print("\nLearned Policy:")
-            state_u = 0
-            for state, action in policy.items():
-                state = state_u
-                action = policy[state]
-                print(f"State {state} -> Action {action} ({steps[str(action)]})")
-                state_u = action
-                if state_u == env.end_state:
-                    break
+
 
 y=1

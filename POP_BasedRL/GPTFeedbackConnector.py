@@ -4,7 +4,7 @@ import json
 from openai import OpenAI
 
 
-OPENAI_API_KEY = 'sk-proj-sbeE4x0JtQjYbNzvzU3ET3BlbkFJY2hPpO3T4X8WWUc61a47'
+OPENAI_API_KEY = ''
 
 class GPTFeedbackConnector:
     def __init__(self, api_key=None):

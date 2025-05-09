@@ -74,7 +74,7 @@ def get_bert_embedding(text):
 action_text_embeddings = torch.cat([get_bert_embedding(t) for t in actions_start], dim=0)
 action_text_embeddings = F.normalize(action_text_embeddings, p=2, dim=1)
 
-# ---------------------- Dummy Environment ---------------------- #
+# ---------------------- Environment ---------------------- #
 class RecipeEnv:
     def __init__(self, bag_of_actions):
         self.max_steps = len(bag_of_actions)
@@ -110,7 +110,7 @@ class RecipeEnv:
 
 
 
-# ------------------- Dummy LLM Reward Function ------------------ #
+# ------------------- LLM Reward Function ------------------ #
 def get_llm_feedback(trajectory,goal, steps):
     connector = GPTFeedbackConnector()
     reward = connector.evaluate_batch(action_sequence=trajectory, actions=steps,
@@ -126,13 +126,6 @@ def get_llm_feedback(trajectory,goal, steps):
 
 
 # -------------------------- Networks ---------------------------- #
-#class StateEncoder(nn.Module):
-#     def __init__(self, emb_dim, hidden_dim):
-#         super().__init__()
-#         self.lstm = nn.LSTM(emb_dim, hidden_dim, batch_first=True)
-#     def forward(self, x):
-#         _, (h, _) = self.lstm(x)
-#         return h.squeeze(0)
 
 class StateEncoder(nn.Module):
     def __init__(self):
@@ -142,26 +135,6 @@ class StateEncoder(nn.Module):
         #last_step = x[:, -1, :]# x shape: [1, seq_len, emb_dim]
         return x.mean(dim=1)
         #return last_step
-
-# class DQN(nn.Module):
-#     def __init__(self, state_dim, act_dim):
-#         super().__init__()
-#         self.fc = nn.Sequential(
-#             nn.Linear(state_dim + act_dim, 128),
-#             nn.ReLU(),
-#             nn.Linear(128, 1)
-#         )
-#         self._init_weights()
-#
-#     def _init_weights(self):
-#         for m in self.fc:
-#             if isinstance(m, nn.Linear):
-#                 nn.init.xavier_uniform_(m.weight)
-#                 nn.init.constant_(m.bias, 0.1)
-#
-#     def forward(self, state_emb, act_emb):
-#         x = torch.cat((state_emb, act_emb), dim=1)
-#         return self.fc(x)
 
 class DQN(nn.Module):
     def __init__(self, state_dim, act_dim):
@@ -379,13 +352,6 @@ def dqn_training_loop_discounted(env, state_encoder, q_network, optimizer, actio
                     R *= gamma
             else:
                 replay_buffer.push(s_seq, a, r, ns_seq, is_terminal)
-            # if reason == 'repetition' :
-            #     replay_buffer.push(s_seq, a, r, ns_seq, is_terminal)
-            # elif reason ==[] and is_terminal: # Early ending
-            #     replay_buffer.push(s_seq, a, r, ns_seq, is_terminal)
-            # else:
-            #     replay_buffer.push(s_seq, a, r, ns_seq, is_terminal)
-            #
 
         if len(replay_buffer) >= 200:
             # Get samples from both buffers
@@ -399,27 +365,12 @@ def dqn_training_loop_discounted(env, state_encoder, q_network, optimizer, actio
             dones = dones+dones_g
 
 
-
-            # batch1 = list(zip(*replay_buffer.sample(32)))
-            # batch2 = list(zip(*replay_buffer_good.sample(32)))
-            #
-            # # Concatenate each component (e.g., states, actions...)
-            # combined = [b1 + b2 for b1, b2 in zip(batch1, batch2)]
-            #
-            # # Unpack the combined tuples
-            # states, actions, rewards, next_states, dones = combined
-
             state_embeds = torch.cat([
                 state_encoder(action_text_embeddings[torch.tensor(s)].unsqueeze(0))
                 for s in states
             ], dim=0)
             state_embeds = F.normalize(state_embeds, p=2, dim=1)
 
-            # # LSTM
-            # next_state_embeds = torch.cat([
-            #     state_encoder(action_text_embeddings[torch.tensor(ns)].unsqueeze(0))
-            #     for ns in next_states
-            # ], dim=0)
 
             #Mean pooling
             next_state_embeds = torch.cat([
@@ -442,7 +393,6 @@ def dqn_training_loop_discounted(env, state_encoder, q_network, optimizer, actio
             rewards_tensor = torch.tensor(rewards, dtype=torch.float32)
             dones_tensor = torch.tensor(dones, dtype=torch.float32)
             targets = rewards_tensor + gamma * next_q_values * (1 - dones_tensor)
-
 
 
             loss = torch.nn.MSELoss()(q_values, targets.detach())
